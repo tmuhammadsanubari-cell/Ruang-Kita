@@ -20,17 +20,28 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const { notifications, dismissNotification, showSuccess, showError, showWarning, showInfo } = useNotifications();
+  
+  // State baru: Mencegah redirect berulang saat switch tab/aplikasi
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Auto-redirect to home page when user logs in
+  // Auto-redirect ke halaman utama HANYA saat inisialisasi login pertama kali
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !isInitialized) {
       if (user.role === 'admin') {
         setCurrentPage('admin-dashboard');
       } else {
         setCurrentPage('home');
       }
+      setIsInitialized(true); // Tandai sudah diinisialisasi
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, isInitialized]);
+
+  // Reset state inisialisasi saat logout agar login berikutnya bisa redirect lagi
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsInitialized(false);
+    }
+  }, [isAuthenticated]);
 
   const handleNavigate = (page: string) => {
     setCurrentPage(page);
