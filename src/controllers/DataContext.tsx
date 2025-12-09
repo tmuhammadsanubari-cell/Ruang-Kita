@@ -1,7 +1,8 @@
 // Controller - Data Management Context
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Facility, Reservation, ReservationStatus, FacilityStatus } from '../models/types';
-import { supabase } from '../lib/supabase'; // Pastikan path ini sesuai
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext'; // [REVISI] Import useAuth
 
 interface DataContextType {
   facilities: Facility[];
@@ -18,6 +19,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth(); // [REVISI] Ambil user dari AuthContext
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
@@ -41,7 +43,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           location: item.location,
           status: item.status,
           description: item.description,
-          image: item.image_url, // Pastikan nama kolom di DB adalah image_url
+          image: item.image_url,
           features: item.features || [],
           createdAt: new Date(item.created_at)
         }));
@@ -54,7 +56,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const fetchReservations = async () => {
     try {
-      // Kita perlu join ke tabel facilities dan profiles untuk dapat namanya
       const { data, error } = await supabase
         .from('reservations')
         .select(`
@@ -70,9 +71,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const loadedReservations: Reservation[] = data.map((item: any) => ({
           id: item.id,
           userId: item.user_id,
-          userName: item.profiles?.name || 'Unknown User', // Ambil dari relasi profiles
+          userName: item.profiles?.name || 'Unknown User',
           facilityId: item.facility_id,
-          facilityName: item.facilities?.name || 'Unknown Facility', // Ambil dari relasi facilities
+          facilityName: item.facilities?.name || 'Unknown Facility',
           date: new Date(item.date),
           startTime: item.start_time,
           endTime: item.end_time,
@@ -88,11 +89,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Load data saat komponen pertama kali dimuat
+  // [REVISI] Load data ulang saat user login berubah
   useEffect(() => {
     fetchFacilities();
-    fetchReservations();
-  }, []);
+    
+    // Hanya fetch reservasi jika user sudah login
+    if (user) {
+      fetchReservations();
+    }
+  }, [user]); // Tambahkan dependency 'user'
 
 
   // --- FUNGSI CRUD FACILITIES ---
@@ -107,12 +112,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           location: facilityData.location,
           description: facilityData.description,
           status: facilityData.status,
-          image_url: facilityData.image, // Simpan URL atau Base64 string
+          image_url: facilityData.image,
           features: facilityData.features
         }]);
 
       if (error) throw error;
-      fetchFacilities(); // Refresh data
+      fetchFacilities();
     } catch (error) {
       console.error('Error adding facility:', error);
     }
@@ -120,13 +125,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const updateFacility = async (id: string, updates: Partial<Facility>) => {
     try {
-      // Siapkan object update, mapping key jika perlu
       const dbUpdates: any = { ...updates };
       if (updates.image) {
         dbUpdates.image_url = updates.image;
         delete dbUpdates.image;
       }
-      // Hapus field yang tidak ada di DB
       delete dbUpdates.id; 
       delete dbUpdates.createdAt;
 
@@ -169,7 +172,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .insert([{
           user_id: reservationData.userId,
           facility_id: reservationData.facilityId,
-          date: reservationData.date.toISOString().split('T')[0], // Format YYYY-MM-DD
+          date: reservationData.date.toISOString().split('T')[0],
           start_time: reservationData.startTime,
           end_time: reservationData.endTime,
           purpose: reservationData.purpose,
@@ -178,7 +181,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
       
-      fetchReservations(); // Refresh data
+      fetchReservations();
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Error adding reservation:', error);
@@ -210,7 +213,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Helper filters (tetap dilakukan di sisi klien untuk performa UI yang cepat)
   const getUserReservations = (userId: string) => {
     return reservations.filter(r => r.userId === userId);
   };

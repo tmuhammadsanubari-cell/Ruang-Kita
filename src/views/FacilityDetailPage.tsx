@@ -69,6 +69,22 @@ export function FacilityDetailPage({ facility, onBack, showSuccess, showError }:
     }
   };
 
+  // [REVISI] Fungsi Helper untuk cek bentrok jadwal
+  const checkConflict = (newDate: Date, newStart: string, newEnd: string) => {
+    return facilityReservations.some(reservation => {
+      // Abaikan reservasi yang sudah ditolak
+      if (reservation.status === 'rejected') return false;
+
+      // Cek apakah tanggalnya sama
+      const resDate = new Date(reservation.date);
+      if (resDate.toDateString() !== newDate.toDateString()) return false;
+
+      // Logika overlap waktu: (StartA < EndB) dan (EndA > StartB)
+      // Artinya waktu yang baru diminta bertabrakan dengan waktu yang sudah ada
+      return newStart < reservation.endTime && newEnd > reservation.startTime;
+    });
+  };
+
   const handleReservation = () => {
     if (!selectedDate || !startTime || !endTime || !purpose) {
       showError('Mohon lengkapi semua data reservasi');
@@ -77,6 +93,12 @@ export function FacilityDetailPage({ facility, onBack, showSuccess, showError }:
 
     if (startTime >= endTime) {
       showError('Waktu selesai harus lebih besar dari waktu mulai');
+      return;
+    }
+
+    // [REVISI] Validasi bentrok sebelum submit
+    if (checkConflict(selectedDate, startTime, endTime)) {
+      showError('Jadwal bentrok! Fasilitas sudah dipesan pada jam tersebut.');
       return;
     }
 

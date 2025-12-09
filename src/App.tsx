@@ -21,39 +21,85 @@ function AppContent() {
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const { notifications, dismissNotification, showSuccess, showError, showWarning, showInfo } = useNotifications();
   
-  // State baru: Mencegah redirect berulang saat switch tab/aplikasi
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Auto-redirect ke halaman utama HANYA saat inisialisasi login pertama kali
+  // --- LOGIC NAVIGASI BROWSER (HISTORY API) ---
+
+  // 1. Listener untuk menangani tombol Back/Forward Browser
   useEffect(() => {
-    if (isAuthenticated && user && !isInitialized) {
-      if (user.role === 'admin') {
-        setCurrentPage('admin-dashboard');
+    const handlePopState = (event: PopStateEvent) => {
+      // Jika user tidak login, jangan biarkan navigasi history mengubah state aplikasi
+      // Tampilan akan tetap terkunci di Login Page karena return di bawah
+      if (!isAuthenticated) return;
+
+      if (event.state) {
+        // Kembalikan halaman sesuai history
+        if (event.state.page) {
+          setCurrentPage(event.state.page);
+        }
+        // Kembalikan data fasilitas jika ada (untuk halaman detail)
+        if (event.state.facility) {
+          setSelectedFacility(event.state.facility);
+        } else {
+          setSelectedFacility(null);
+        }
       } else {
-        setCurrentPage('home');
+        // Fallback jika history kosong (kembali ke home/dashboard default)
+        const defaultPage = user?.role === 'admin' ? 'admin-dashboard' : 'home';
+        setCurrentPage(defaultPage);
+        setSelectedFacility(null);
       }
-      setIsInitialized(true); // Tandai sudah diinisialisasi
-    }
-  }, [isAuthenticated, user, isInitialized]);
+    };
 
-  // Reset state inisialisasi saat logout agar login berikutnya bisa redirect lagi
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsInitialized(false);
-    }
-  }, [isAuthenticated]);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isAuthenticated, user]);
 
+  // 2. Fungsi Navigasi yang diperbarui dengan Push State
   const handleNavigate = (page: string) => {
+    // Push state baru ke browser history agar tombol back berfungsi
+    // Argumen: state object, title (kosong), url (opsional, kita biarkan kosong agar tetap di root)
+    window.history.pushState({ page, facility: null }, '', '');
+    
     setCurrentPage(page);
     setSelectedFacility(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // 3. Fungsi Detail Fasilitas yang diperbarui dengan Push State
   const handleViewFacilityDetail = (facility: Facility) => {
+    // Simpan data fasilitas di history state agar saat di-back datanya ada lagi
+    window.history.pushState({ page: 'facility-detail', facility }, '', '');
+    
     setSelectedFacility(facility);
     setCurrentPage('facility-detail');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // 4. Inisialisasi Redirect Login & Reset History
+  useEffect(() => {
+    if (isAuthenticated && user && !isInitialized) {
+      const startPage = user.role === 'admin' ? 'admin-dashboard' : 'home';
+      setCurrentPage(startPage);
+      
+      // Saat baru login, kita REPLACE state history saat ini.
+      // Ini mencegah user menekan tombol "Back" untuk kembali ke halaman Login.
+      window.history.replaceState({ page: startPage, facility: null }, '', '');
+      
+      setIsInitialized(true);
+    }
+  }, [isAuthenticated, user, isInitialized]);
+
+  // 5. Reset saat Logout
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsInitialized(false);
+      // Opsional: Bersihkan history state saat logout agar bersih
+      window.history.replaceState(null, '', '');
+    }
+  }, [isAuthenticated]);
+
+  // --- END LOGIC NAVIGASI ---
 
   const handleLoginSuccess = () => {
     showSuccess('Login berhasil! Selamat datang kembali');
@@ -97,7 +143,10 @@ function AppContent() {
           {currentPage === 'facility-detail' && selectedFacility && (
             <FacilityDetailPage
               facility={selectedFacility}
-              onBack={() => handleNavigate('facilities')}
+              onBack={() => {
+                // Gunakan history.back() untuk tombol UI "Kembali" agar sinkron dengan browser
+                window.history.back(); 
+              }}
               showSuccess={showSuccess}
               showError={showError}
             />
