@@ -1,7 +1,3 @@
-Berikut adalah draf dokumentasi **README.md** untuk proyek **RuangKita** berdasarkan struktur file dan kode yang Anda berikan:
-
----
-
 # RuangKita - Campus Facility Reservation App
 
 RuangKita adalah aplikasi berbasis web yang dirancang untuk mempermudah proses pemesanan fasilitas di lingkungan kampus. Aplikasi ini menyediakan platform terpusat bagi mahasiswa untuk melihat ketersediaan ruangan dan bagi admin untuk mengelola pemesanan secara efisien.
